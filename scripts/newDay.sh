@@ -20,7 +20,7 @@ import { day$1, day$1part2 } from './day$1';
 import { data } from './day$1.data';
 
 const testString = '';
-const testData = parseInput(testString);
+const testData = parseInput(testString) as number[];
 
 describe.only('day $1', () => {
   it.only('test cases', () => {
