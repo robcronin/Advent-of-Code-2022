@@ -91,6 +91,9 @@ const getOnString = (valves: Valves) =>
     .sort((a, b) => (a > b ? 1 : -1))
     .toString();
 
+const getAllOn = (valves: Valves): boolean =>
+  Object.values(valves).every((valve) => valve.on);
+
 const getMaxPressure = (
   valves: Valves,
   location: string,
@@ -170,49 +173,52 @@ const getMaxPressure2 = (
   elephantTimeLeft: number,
 ): number => {
   if (currentTimeLeft <= 1 && elephantTimeLeft <= 1) return currentPressure;
+  if (getAllOn(valves)) return currentPressure;
   const memoString = `${location}-${elephantLocation}-${currentTimeLeft}-${elephantTimeLeft}-${currentPressure}-${getOnString(
     valves,
   )}`;
-  if (memo[memoString]) return memo[memoString];
+  if (memo[memoString]) {
+    return memo[memoString];
+  }
+
   const currentValve = valves[location];
   const elephantValve = valves[elephantLocation];
+
   const myOptions: Option[] = [];
   const elephantOptions: Option[] = [];
+
   if (
     !currentValve.on &&
     currentValve.flowRate > 0 &&
     currentTimeLeft >= elephantTimeLeft &&
-    currentTimeLeft > 0
+    currentTimeLeft >= 2
   ) {
-    if (currentTimeLeft >= 0) {
-      // on, move, on, effect,
-      currentValve.leads.forEach((lead) => {
-        const newValves = {
-          ...valves,
-          [location]: { ...currentValve, on: true },
-        };
-        const timeLeftAfterMove = currentTimeLeft - 1 - lead.steps;
-        myOptions.push({
-          valves: newValves,
-          location: lead.id,
-          timeLeftAfterMove,
-          turnedOn: currentValve.id,
-        });
+    currentValve.leads.forEach((lead) => {
+      const newValves = {
+        ...valves,
+        [location]: { ...currentValve, on: true },
+      };
+      const timeLeftAfterMove = currentTimeLeft - 1 - lead.steps;
+      myOptions.push({
+        valves: newValves,
+        location: lead.id,
+        timeLeftAfterMove,
+        turnedOn: currentValve.id,
       });
-    }
+    });
   }
   if (
     !elephantValve.on &&
     elephantValve.flowRate > 0 &&
     elephantTimeLeft >= currentTimeLeft &&
-    elephantTimeLeft > 0
+    elephantTimeLeft >= 2
   ) {
     if (elephantTimeLeft >= 0) {
       // on, move, on, effect,
       elephantValve.leads.forEach((lead) => {
         const newValves = {
           ...valves,
-          [location]: { ...elephantValve, on: true },
+          [elephantLocation]: { ...elephantValve, on: true },
         };
         const timeLeftAfterMove = elephantTimeLeft - 1 - lead.steps;
         elephantOptions.push({
@@ -224,11 +230,7 @@ const getMaxPressure2 = (
       });
     }
   }
-  if (
-    currentTimeLeft - 1 - 1 - 1 >= 0 &&
-    currentTimeLeft >= elephantTimeLeft &&
-    currentTimeLeft > 0
-  ) {
+  if (currentTimeLeft >= 3 && currentTimeLeft >= elephantTimeLeft) {
     currentValve.leads.forEach((lead) => {
       const newValves = {
         ...valves,
@@ -242,11 +244,7 @@ const getMaxPressure2 = (
       });
     });
   }
-  if (
-    elephantTimeLeft - 1 - 1 - 1 >= 0 &&
-    elephantTimeLeft >= currentTimeLeft &&
-    elephantTimeLeft > 0
-  ) {
+  if (elephantTimeLeft >= 3 && elephantTimeLeft >= currentTimeLeft) {
     elephantValve.leads.forEach((lead) => {
       const newValves = {
         ...valves,
@@ -260,39 +258,34 @@ const getMaxPressure2 = (
       });
     });
   }
-  if (myOptions.length === 0) {
+  if (myOptions.length === 0 && elephantOptions.length > 0) {
     myOptions.push({
       valves: { ...valves },
       location: currentValve.id,
       timeLeftAfterMove: currentTimeLeft,
     });
   }
-  if (elephantOptions.length === 0) {
+  if (elephantOptions.length === 0 && myOptions.length > 0) {
     elephantOptions.push({
       valves: { ...valves },
       location: elephantValve.id,
       timeLeftAfterMove: elephantTimeLeft,
     });
   }
+
   let max = 0;
   myOptions.forEach((myOption) => {
     elephantOptions.forEach((elephantOption) => {
-      if (
-        myOption.location === 'DD' &&
-        myOption.timeLeftAfterMove === 4 &&
-        !myOption.turnedOn &&
-        elephantOption.location === 'JJ' &&
-        elephantOption.timeLeftAfterMove === 3 &&
-        !elephantOption.turnedOn
-      ) {
-        console.log('HAHAHAHALA');
-      }
-      const combinedValves = { ...myOption.valves };
+      const combinedValves = Object.keys(myOption.valves).reduce(
+        (acc: Valves, key) => ({ ...acc, [key]: { ...myOption.valves[key] } }),
+        {},
+      );
       Object.keys(combinedValves).forEach((valveKey) => {
         if (elephantOption.valves[valveKey].on) {
           combinedValves[valveKey].on = true;
         }
       });
+
       const sameTurnOn =
         myOption.turnedOn &&
         elephantOption.turnedOn &&
@@ -309,8 +302,8 @@ const getMaxPressure2 = (
         if (turnOnMax > max) max = turnOnMax;
 
         const potentialPressure =
-          myOption.timeLeftAfterMove >= 1 ||
-          elephantOption.timeLeftAfterMove >= 1
+          myOption.timeLeftAfterMove >= 2 ||
+          elephantOption.timeLeftAfterMove >= 2
             ? getMaxPressure2(
                 combinedValves,
                 myOption.location,
@@ -322,25 +315,7 @@ const getMaxPressure2 = (
                   : 0,
               )
             : 0;
-        if (
-          myOption.location === 'DD' &&
-          myOption.timeLeftAfterMove === 4 &&
-          !myOption.turnedOn &&
-          elephantOption.location === 'JJ' &&
-          elephantOption.timeLeftAfterMove === 3 &&
-          !elephantOption.turnedOn
-        ) {
-          console.log(
-            combinedValves,
-            myOption.location,
-            elephantOption.location,
-            turnOnMax,
-            myOption.timeLeftAfterMove > 0 ? myOption.timeLeftAfterMove : 0,
-            elephantOption.timeLeftAfterMove > 0
-              ? elephantOption.timeLeftAfterMove
-              : 0,
-          );
-        }
+
         if (potentialPressure > max) max = potentialPressure;
       }
     });
