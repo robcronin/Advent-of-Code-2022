@@ -1,4 +1,5 @@
 import { sumArr } from '../utils/array';
+import { range } from '../utils/looping';
 
 type Lead = { id: string; steps: number };
 type Valve = {
@@ -170,6 +171,7 @@ type Option = {
   moveTo?: string;
   weight: number;
 };
+type Path = Option & { pressure: number; valves: Valves };
 
 const getOptions = (
   valves: Valves,
@@ -203,14 +205,44 @@ const chooseOption = (options: Option[]): Option => {
   return result;
 };
 
-const generatePath = (givenValves: Valves, time: number) => {
+const chooseParent = (paths: FullPath[]): FullPath => {
+  const totalWeight = sumArr(paths, (path) => path.pressure);
+  const rand = Math.random() * totalWeight;
+  let sum = 0;
+  const result = paths.find((path) => {
+    sum += path.pressure;
+    return rand <= sum;
+  });
+  if (!result) throw new Error('chooseParent failed');
+  return result;
+};
+
+type FullPath = {
+  myPath: Path[];
+  elephantPath: Path[];
+  pressure: number;
+};
+
+const generatePath = (
+  givenValves: Valves,
+  time: number,
+  startPos?: {
+    myLocation: string;
+    elephantLocation: string;
+    timeLeft: number;
+    pressure: number;
+    myPath: Path[];
+    elephantPath: Path[];
+  },
+): FullPath => {
   const valves = deepCopyValves(givenValves);
-  let myLocation = 'AA';
-  let elephantLocation = 'AA';
-  let timeLeft = time;
-  let pressure = 0;
-  let myPath = [];
-  let elephantPath = [];
+  let myLocation = startPos?.myLocation ?? 'AA';
+  let elephantLocation = startPos?.elephantLocation ?? 'AA';
+  let timeLeft = startPos?.timeLeft ?? time;
+  let pressure = startPos?.pressure ?? 0;
+  let myPath: Path[] = startPos?.myPath ?? [];
+  let elephantPath: Path[] = startPos?.elephantPath ?? [];
+
   while (!getAllOn(valves) && timeLeft > 0) {
     const myValve = valves[myLocation];
     const elephantValve = valves[elephantLocation];
@@ -234,8 +266,12 @@ const generatePath = (givenValves: Valves, time: number) => {
     } else if (elephantOption.moveTo) {
       elephantLocation = elephantOption.moveTo;
     }
-    myPath.push(myOption);
-    elephantPath.push(elephantOption);
+    myPath.push({ ...myOption, pressure, valves: deepCopyValves(valves) });
+    elephantPath.push({
+      ...elephantOption,
+      pressure,
+      valves: deepCopyValves(valves),
+    });
     timeLeft -= 1;
   }
   return { myPath, elephantPath, pressure };
@@ -252,17 +288,74 @@ export const day16part2 = (input: string[], time: number) => {
   const valves = parseValves(input);
   let max = 0;
   // let max = 2166;
+  const poolSize = time * 5;
+  const prePoolSample = 1 * time;
+  const poolThreshold = 0.5;
+  const geneticIncreaseThreshold = time * 5000;
   let timeSinceIncrease = 0;
-  while (timeSinceIncrease < time * 10000) {
+  range(prePoolSample).forEach(() => {
     const path = generatePath(valves, time);
     if (path.pressure > max) {
       max = path.pressure;
-      console.log('new Max', max);
+    }
+  });
+  console.log('pre pool creation max', max);
+  let pool = [];
+  while (pool.length < poolSize) {
+    const path = generatePath(valves, time);
+    if (path.pressure > max) {
+      max = path.pressure;
+    }
+    if (path.pressure > max * poolThreshold) {
+      pool.push(path);
+    }
+  }
+  pool.sort((a, b) => b.pressure - a.pressure);
+  // console.log({ pool });
+  console.log('max at pre mutation point', max);
+  while (timeSinceIncrease < geneticIncreaseThreshold) {
+    // const parentIndex = Math.floor(poolSize * Math.random());
+    // const parent = pool[parentIndex];
+    const parent = chooseParent(pool);
+    const mutationIndex =
+      Math.floor((parent.myPath.length - 1) * Math.random()) + 1;
+    const myPath = parent.myPath.slice(0, mutationIndex);
+    const elephantPath = parent.elephantPath.slice(0, mutationIndex);
+    const myLocation =
+      myPath[myPath.length - 1].turnOn ||
+      (myPath[myPath.length - 1].moveTo as string);
+    const elephantLocation =
+      elephantPath[elephantPath.length - 1].turnOn ||
+      (elephantPath[elephantPath.length - 1].moveTo as string);
+    const startPoint = {
+      myLocation,
+      elephantLocation,
+      timeLeft: time - mutationIndex,
+      pressure: myPath[myPath.length - 1].pressure,
+      myPath: parent.myPath.slice(0, mutationIndex),
+      elephantPath: parent.elephantPath.slice(0, mutationIndex),
+    };
+    // console.log({ mutationIndex, startPoint });
+    const path = generatePath(
+      deepCopyValves(myPath[myPath.length - 1].valves),
+      startPoint.timeLeft,
+      startPoint,
+    );
+    // console.log({ path });
+    if (path.pressure > max) {
+      max = path.pressure;
+      console.log('new max in genetic', max);
       timeSinceIncrease = 0;
     } else {
       timeSinceIncrease++;
     }
+    // if (path.pressure > pool[pool.length - 1].pressure) {
+    pool.pop();
+    pool.push(path);
+    pool.sort((a, b) => b.pressure - a.pressure);
+    // }
   }
+  console.log('max at post mutation point', max);
 
   return max;
 };

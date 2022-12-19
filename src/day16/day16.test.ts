@@ -38,10 +38,10 @@ describe.only('day 16 part 2', () => {
   it('extra test cases - 15', () => {
     expect(day16part2(testData, 15)).toBe(816);
   });
-  it('extra test cases - 18', () => {
+  it.only('extra test cases - 18', () => {
     expect(day16part2(testData, 18)).toBe(1059);
   });
-  it.skip('test cases', () => {
+  it('test cases', () => {
     expect(day16part2(testData, 26)).toBe(1707);
   });
 
@@ -54,13 +54,9 @@ describe.only('day 16 part 2', () => {
     expect(answer).toBe(744);
   });
 
-  it.only('answer', () => {
+  it('answer', () => {
     const answer = day16part2(data, 26);
     logAnswer(answer, 16, 2);
     expect(answer).toBe(16);
-    // 2055 - too low
-    // 2079 - too low
-    // 2130 - too low
-    // 2166 - too low
   });
 });
