@@ -1,3 +1,9 @@
+/*
+  This is a complete hack of code
+  I haven't even slightly attempted to clean this up once the star popped
+  Don't judge 😅
+*/
+
 import { sumArr } from '../utils/array';
 import { range } from '../utils/looping';
 
