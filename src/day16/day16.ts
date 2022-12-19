@@ -31,10 +31,8 @@ const reduceValves = (valves: Valves, numMinutes: number, keepId: string) => {
   while (changesMade && count <= numMinutes) {
     changesMade = false;
     count++;
-    // console.log({ newValves, I: newValves.II.leads, B: newValves.BB.leads });
     const newValveValues = Object.values(newValves)
       .map((valve) => {
-        // if (valve.id === 'BB') console.log('pre', { valve });
         const newLeads = valve.leads
           .map((lead) => {
             if (newValves[lead.id] && newValves[lead.id].flowRate === 0) {
@@ -50,8 +48,6 @@ const reduceValves = (valves: Valves, numMinutes: number, keepId: string) => {
           })
           .flat()
           .filter((lead) => lead.id !== valve.id);
-        // if (valve.id === 'BB')
-        //   console.log('new', { valveid: valve.id, newLeads });
         const reducedLeads: Lead[] = newLeads
           .filter(
             (newLead) =>
@@ -65,8 +61,6 @@ const reduceValves = (valves: Valves, numMinutes: number, keepId: string) => {
             }
             return acc;
           }, []);
-        // if (valve.id === 'BB')
-        //   console.log('reduced', { valveid: valve.id, reducedLeads });
 
         return { ...valve, leads: reducedLeads };
       })
@@ -114,7 +108,7 @@ const getMaxPressure = (
   if (!currentValve.on) {
     const pressureHere = currentValve.flowRate * (currentTimeLeft - 1);
     onMax = pressureHere + currentPressure;
-    if (currentTimeLeft - 1 - 1 - 1 - 1 > 0) {
+    if (currentTimeLeft - 1 - 1 - 1 - 1 >= 0) {
       // on, move, on, effect,
       currentValve.leads.forEach((lead) => {
         const newValves = {
@@ -136,7 +130,7 @@ const getMaxPressure = (
       });
     }
   }
-  if (currentTimeLeft - 1 - 1 - 1 > 0) {
+  if (currentTimeLeft - 1 - 1 - 1 >= 0) {
     currentValve.leads.forEach((lead) => {
       const newValves = {
         ...valves,
@@ -164,7 +158,6 @@ export const day16 = (input: string[], time: number) => {
   memo = {};
   const valves = parseValves(input);
   const reducedValves = reduceValves(valves, time, 'AA');
-  // console.log(JSON.stringify(reducedValves));
   return getMaxPressure(reducedValves, 'AA', 0, time);
 };
 export const day16part2 = (input: string[]) => {
