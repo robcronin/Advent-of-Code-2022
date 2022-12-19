@@ -22,7 +22,7 @@ describe('day 16', () => {
   });
 });
 
-describe('day 16 part 2', () => {
+describe.only('day 16 part 2', () => {
   it('extra test cases - 3', () => {
     expect(day16part2(testData, 3)).toBe(33);
   });
@@ -41,15 +41,15 @@ describe('day 16 part 2', () => {
   it('extra test cases - 18', () => {
     expect(day16part2(testData, 18)).toBe(1059);
   });
-  it('test cases', () => {
+  it.skip('test cases', () => {
     expect(day16part2(testData, 26)).toBe(1707);
   });
 
-  it('answer test case - 10', () => {
+  it.skip('answer test case - 10', () => {
     const answer = day16part2(data, 10);
     expect(answer).toBe(255);
   });
-  it('answer test case - 15', () => {
+  it.skip('answer test case - 15', () => {
     const answer = day16part2(data, 15);
     expect(answer).toBe(744);
   });
@@ -58,5 +58,9 @@ describe('day 16 part 2', () => {
     const answer = day16part2(data, 26);
     logAnswer(answer, 16, 2);
     expect(answer).toBe(16);
+    // 2055 - too low
+    // 2079 - too low
+    // 2130 - too low
+    // 2166 - too low
   });
 });

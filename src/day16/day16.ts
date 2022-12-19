@@ -1,3 +1,5 @@
+import { sumArr } from '../utils/array';
+
 type Lead = { id: string; steps: number };
 type Valve = {
   id: string;
@@ -94,6 +96,12 @@ const getOnString = (valves: Valves) =>
 const getAllOn = (valves: Valves): boolean =>
   Object.values(valves).every((valve) => valve.on);
 
+const deepCopyValves = (valves: Valves): Valves =>
+  Object.keys(valves).reduce(
+    (acc: Valves, key) => ({ ...acc, [key]: { ...valves[key] } }),
+    {},
+  );
+
 const getMaxPressure = (
   valves: Valves,
   location: string,
@@ -158,171 +166,79 @@ const getMaxPressure = (
 };
 
 type Option = {
-  valves: Valves;
-  location: string;
-  timeLeftAfterMove: number;
-  turnedOn?: string;
+  turnOn?: string;
+  moveTo?: string;
+  weight: number;
 };
 
-const getMaxPressure2 = (
+const getOptions = (
   valves: Valves,
   location: string,
-  elephantLocation: string,
-  currentPressure: number,
-  currentTimeLeft: number,
-  elephantTimeLeft: number,
-): number => {
-  if (currentTimeLeft <= 1 && elephantTimeLeft <= 1) return currentPressure;
-  if (getAllOn(valves)) return currentPressure;
-  const memoString = `${location}-${elephantLocation}-${currentTimeLeft}-${elephantTimeLeft}-${currentPressure}-${getOnString(
-    valves,
-  )}`;
-  if (memo[memoString]) {
-    return memo[memoString];
+  sameLoc?: boolean,
+): Option[] => {
+  const valve = valves[location];
+  const options: Option[] = [];
+  if (!valve.on && valve.flowRate > 0 && !sameLoc) {
+    options.push({ turnOn: location, weight: valve.flowRate });
   }
-
-  const currentValve = valves[location];
-  const elephantValve = valves[elephantLocation];
-
-  const myOptions: Option[] = [];
-  const elephantOptions: Option[] = [];
-
-  if (
-    !currentValve.on &&
-    currentValve.flowRate > 0 &&
-    currentTimeLeft >= elephantTimeLeft &&
-    currentTimeLeft >= 2
-  ) {
-    currentValve.leads.forEach((lead) => {
-      const newValves = {
-        ...valves,
-        [location]: { ...currentValve, on: true },
-      };
-      const timeLeftAfterMove = currentTimeLeft - 1 - lead.steps;
-      myOptions.push({
-        valves: newValves,
-        location: lead.id,
-        timeLeftAfterMove,
-        turnedOn: currentValve.id,
-      });
-    });
-  }
-  if (
-    !elephantValve.on &&
-    elephantValve.flowRate > 0 &&
-    elephantTimeLeft >= currentTimeLeft &&
-    elephantTimeLeft >= 2
-  ) {
-    if (elephantTimeLeft >= 0) {
-      // on, move, on, effect,
-      elephantValve.leads.forEach((lead) => {
-        const newValves = {
-          ...valves,
-          [elephantLocation]: { ...elephantValve, on: true },
-        };
-        const timeLeftAfterMove = elephantTimeLeft - 1 - lead.steps;
-        elephantOptions.push({
-          valves: newValves,
-          location: lead.id,
-          timeLeftAfterMove,
-          turnedOn: elephantValve.id,
-        });
-      });
-    }
-  }
-  if (currentTimeLeft >= 3 && currentTimeLeft >= elephantTimeLeft) {
-    currentValve.leads.forEach((lead) => {
-      const newValves = {
-        ...valves,
-      };
-      const timeLeftAfterMove = currentTimeLeft - lead.steps;
-
-      myOptions.push({
-        valves: newValves,
-        location: lead.id,
-        timeLeftAfterMove,
-      });
-    });
-  }
-  if (elephantTimeLeft >= 3 && elephantTimeLeft >= currentTimeLeft) {
-    elephantValve.leads.forEach((lead) => {
-      const newValves = {
-        ...valves,
-      };
-      const timeLeftAfterMove = elephantTimeLeft - lead.steps;
-
-      elephantOptions.push({
-        valves: newValves,
-        location: lead.id,
-        timeLeftAfterMove,
-      });
-    });
-  }
-  if (myOptions.length === 0 && elephantOptions.length > 0) {
-    myOptions.push({
-      valves: { ...valves },
-      location: currentValve.id,
-      timeLeftAfterMove: currentTimeLeft,
-    });
-  }
-  if (elephantOptions.length === 0 && myOptions.length > 0) {
-    elephantOptions.push({
-      valves: { ...valves },
-      location: elephantValve.id,
-      timeLeftAfterMove: elephantTimeLeft,
-    });
-  }
-
-  let max = 0;
-  myOptions.forEach((myOption) => {
-    elephantOptions.forEach((elephantOption) => {
-      const combinedValves = Object.keys(myOption.valves).reduce(
-        (acc: Valves, key) => ({ ...acc, [key]: { ...myOption.valves[key] } }),
-        {},
-      );
-      Object.keys(combinedValves).forEach((valveKey) => {
-        if (elephantOption.valves[valveKey].on) {
-          combinedValves[valveKey].on = true;
-        }
-      });
-
-      const sameTurnOn =
-        myOption.turnedOn &&
-        elephantOption.turnedOn &&
-        myOption.turnedOn === elephantOption.turnedOn;
-      if (!sameTurnOn) {
-        const myPressureHere = myOption.turnedOn
-          ? currentValve.flowRate * (currentTimeLeft - 1)
-          : 0;
-        const elephantPressureHere = elephantOption.turnedOn
-          ? elephantValve.flowRate * (elephantTimeLeft - 1)
-          : 0;
-        const turnOnMax =
-          myPressureHere + elephantPressureHere + currentPressure;
-        if (turnOnMax > max) max = turnOnMax;
-
-        const potentialPressure =
-          myOption.timeLeftAfterMove >= 2 ||
-          elephantOption.timeLeftAfterMove >= 2
-            ? getMaxPressure2(
-                combinedValves,
-                myOption.location,
-                elephantOption.location,
-                turnOnMax,
-                myOption.timeLeftAfterMove > 0 ? myOption.timeLeftAfterMove : 0,
-                elephantOption.timeLeftAfterMove > 0
-                  ? elephantOption.timeLeftAfterMove
-                  : 0,
-              )
-            : 0;
-
-        if (potentialPressure > max) max = potentialPressure;
-      }
+  valve.leads.forEach((lead) => {
+    const leadValve = valves[lead.id];
+    options.push({
+      moveTo: leadValve.id,
+      weight: 1 + (!leadValve.on ? leadValve.flowRate : 0),
     });
   });
+  return options;
+};
 
-  memo[memoString] = max;
-  return max;
+const chooseOption = (options: Option[]): Option => {
+  const totalWeight = sumArr(options, (option) => option.weight);
+  const rand = Math.random() * totalWeight;
+  let sum = 0;
+  const result = options.find((option) => {
+    sum += option.weight;
+    return rand <= sum;
+  });
+  if (!result) throw new Error('chooseOption failed');
+  return result;
+};
+
+const generatePath = (givenValves: Valves, time: number) => {
+  const valves = deepCopyValves(givenValves);
+  let myLocation = 'AA';
+  let elephantLocation = 'AA';
+  let timeLeft = time;
+  let pressure = 0;
+  let myPath = [];
+  let elephantPath = [];
+  while (!getAllOn(valves) && timeLeft > 0) {
+    const myValve = valves[myLocation];
+    const elephantValve = valves[elephantLocation];
+    const myOptions = getOptions(valves, myLocation);
+    const elephantOptions = getOptions(
+      valves,
+      elephantLocation,
+      myLocation === elephantLocation,
+    );
+    const myOption = chooseOption(myOptions);
+    const elephantOption = chooseOption(elephantOptions);
+    if (myOption.turnOn) {
+      pressure += myValve.flowRate * (timeLeft - 1);
+      valves[myLocation].on = true;
+    } else if (myOption.moveTo) {
+      myLocation = myOption.moveTo;
+    }
+    if (elephantOption.turnOn) {
+      pressure += elephantValve.flowRate * (timeLeft - 1);
+      valves[elephantLocation].on = true;
+    } else if (elephantOption.moveTo) {
+      elephantLocation = elephantOption.moveTo;
+    }
+    myPath.push(myOption);
+    elephantPath.push(elephantOption);
+    timeLeft -= 1;
+  }
+  return { myPath, elephantPath, pressure };
 };
 
 export const day16 = (input: string[], time: number) => {
@@ -334,6 +250,19 @@ export const day16 = (input: string[], time: number) => {
 export const day16part2 = (input: string[], time: number) => {
   memo = {};
   const valves = parseValves(input);
-  const reducedValves = reduceValves(valves, time, 'AA');
-  return getMaxPressure2(reducedValves, 'AA', 'AA', 0, time, time);
+  let max = 0;
+  // let max = 2166;
+  let timeSinceIncrease = 0;
+  while (timeSinceIncrease < time * 10000) {
+    const path = generatePath(valves, time);
+    if (path.pressure > max) {
+      max = path.pressure;
+      console.log('new Max', max);
+      timeSinceIncrease = 0;
+    } else {
+      timeSinceIncrease++;
+    }
+  }
+
+  return max;
 };
