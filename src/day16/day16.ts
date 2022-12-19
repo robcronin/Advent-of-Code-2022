@@ -154,12 +154,211 @@ const getMaxPressure = (
   return ret;
 };
 
+type Option = {
+  valves: Valves;
+  location: string;
+  timeLeftAfterMove: number;
+  turnedOn?: string;
+};
+
+const getMaxPressure2 = (
+  valves: Valves,
+  location: string,
+  elephantLocation: string,
+  currentPressure: number,
+  currentTimeLeft: number,
+  elephantTimeLeft: number,
+): number => {
+  if (currentTimeLeft <= 1 && elephantTimeLeft <= 1) return currentPressure;
+  const memoString = `${location}-${elephantLocation}-${currentTimeLeft}-${elephantTimeLeft}-${currentPressure}-${getOnString(
+    valves,
+  )}`;
+  if (memo[memoString]) return memo[memoString];
+  const currentValve = valves[location];
+  const elephantValve = valves[elephantLocation];
+  const myOptions: Option[] = [];
+  const elephantOptions: Option[] = [];
+  if (
+    !currentValve.on &&
+    currentValve.flowRate > 0 &&
+    currentTimeLeft >= elephantTimeLeft &&
+    currentTimeLeft > 0
+  ) {
+    if (currentTimeLeft >= 0) {
+      // on, move, on, effect,
+      currentValve.leads.forEach((lead) => {
+        const newValves = {
+          ...valves,
+          [location]: { ...currentValve, on: true },
+        };
+        const timeLeftAfterMove = currentTimeLeft - 1 - lead.steps;
+        myOptions.push({
+          valves: newValves,
+          location: lead.id,
+          timeLeftAfterMove,
+          turnedOn: currentValve.id,
+        });
+      });
+    }
+  }
+  if (
+    !elephantValve.on &&
+    elephantValve.flowRate > 0 &&
+    elephantTimeLeft >= currentTimeLeft &&
+    elephantTimeLeft > 0
+  ) {
+    if (elephantTimeLeft >= 0) {
+      // on, move, on, effect,
+      elephantValve.leads.forEach((lead) => {
+        const newValves = {
+          ...valves,
+          [location]: { ...elephantValve, on: true },
+        };
+        const timeLeftAfterMove = elephantTimeLeft - 1 - lead.steps;
+        elephantOptions.push({
+          valves: newValves,
+          location: lead.id,
+          timeLeftAfterMove,
+          turnedOn: elephantValve.id,
+        });
+      });
+    }
+  }
+  if (
+    currentTimeLeft - 1 - 1 - 1 >= 0 &&
+    currentTimeLeft >= elephantTimeLeft &&
+    currentTimeLeft > 0
+  ) {
+    currentValve.leads.forEach((lead) => {
+      const newValves = {
+        ...valves,
+      };
+      const timeLeftAfterMove = currentTimeLeft - lead.steps;
+
+      myOptions.push({
+        valves: newValves,
+        location: lead.id,
+        timeLeftAfterMove,
+      });
+    });
+  }
+  if (
+    elephantTimeLeft - 1 - 1 - 1 >= 0 &&
+    elephantTimeLeft >= currentTimeLeft &&
+    elephantTimeLeft > 0
+  ) {
+    elephantValve.leads.forEach((lead) => {
+      const newValves = {
+        ...valves,
+      };
+      const timeLeftAfterMove = elephantTimeLeft - lead.steps;
+
+      elephantOptions.push({
+        valves: newValves,
+        location: lead.id,
+        timeLeftAfterMove,
+      });
+    });
+  }
+  if (myOptions.length === 0) {
+    myOptions.push({
+      valves: { ...valves },
+      location: currentValve.id,
+      timeLeftAfterMove: currentTimeLeft,
+    });
+  }
+  if (elephantOptions.length === 0) {
+    elephantOptions.push({
+      valves: { ...valves },
+      location: elephantValve.id,
+      timeLeftAfterMove: elephantTimeLeft,
+    });
+  }
+  let max = 0;
+  myOptions.forEach((myOption) => {
+    elephantOptions.forEach((elephantOption) => {
+      if (
+        myOption.location === 'DD' &&
+        myOption.timeLeftAfterMove === 4 &&
+        !myOption.turnedOn &&
+        elephantOption.location === 'JJ' &&
+        elephantOption.timeLeftAfterMove === 3 &&
+        !elephantOption.turnedOn
+      ) {
+        console.log('HAHAHAHALA');
+      }
+      const combinedValves = { ...myOption.valves };
+      Object.keys(combinedValves).forEach((valveKey) => {
+        if (elephantOption.valves[valveKey].on) {
+          combinedValves[valveKey].on = true;
+        }
+      });
+      const sameTurnOn =
+        myOption.turnedOn &&
+        elephantOption.turnedOn &&
+        myOption.turnedOn === elephantOption.turnedOn;
+      if (!sameTurnOn) {
+        const myPressureHere = myOption.turnedOn
+          ? currentValve.flowRate * (currentTimeLeft - 1)
+          : 0;
+        const elephantPressureHere = elephantOption.turnedOn
+          ? elephantValve.flowRate * (elephantTimeLeft - 1)
+          : 0;
+        const turnOnMax =
+          myPressureHere + elephantPressureHere + currentPressure;
+        if (turnOnMax > max) max = turnOnMax;
+
+        const potentialPressure =
+          myOption.timeLeftAfterMove >= 1 ||
+          elephantOption.timeLeftAfterMove >= 1
+            ? getMaxPressure2(
+                combinedValves,
+                myOption.location,
+                elephantOption.location,
+                turnOnMax,
+                myOption.timeLeftAfterMove > 0 ? myOption.timeLeftAfterMove : 0,
+                elephantOption.timeLeftAfterMove > 0
+                  ? elephantOption.timeLeftAfterMove
+                  : 0,
+              )
+            : 0;
+        if (
+          myOption.location === 'DD' &&
+          myOption.timeLeftAfterMove === 4 &&
+          !myOption.turnedOn &&
+          elephantOption.location === 'JJ' &&
+          elephantOption.timeLeftAfterMove === 3 &&
+          !elephantOption.turnedOn
+        ) {
+          console.log(
+            combinedValves,
+            myOption.location,
+            elephantOption.location,
+            turnOnMax,
+            myOption.timeLeftAfterMove > 0 ? myOption.timeLeftAfterMove : 0,
+            elephantOption.timeLeftAfterMove > 0
+              ? elephantOption.timeLeftAfterMove
+              : 0,
+          );
+        }
+        if (potentialPressure > max) max = potentialPressure;
+      }
+    });
+  });
+
+  memo[memoString] = max;
+  return max;
+};
+
 export const day16 = (input: string[], time: number) => {
   memo = {};
   const valves = parseValves(input);
   const reducedValves = reduceValves(valves, time, 'AA');
   return getMaxPressure(reducedValves, 'AA', 0, time);
 };
-export const day16part2 = (input: string[]) => {
-  return 16;
+export const day16part2 = (input: string[], time: number) => {
+  memo = {};
+  const valves = parseValves(input);
+  const reducedValves = reduceValves(valves, time, 'AA');
+  return getMaxPressure2(reducedValves, 'AA', 'AA', 0, time, time);
 };
