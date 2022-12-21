@@ -1,3 +1,9 @@
+/*
+  Note: The x and y coordinates are backwards from convention
+      x is the rowNumber
+      y is the colNumber
+*/
+
 import { range } from './looping';
 
 export type Grid<ValueType> = ValueType[][];
