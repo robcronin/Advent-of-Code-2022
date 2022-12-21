@@ -6,9 +6,11 @@ if [ $? -ne 0 ] ; then
   exit
 fi
 
-echo "export const day$1 = (input: string[]) => {
+echo "
+export const day$1 = (input: string[]) => {
   return $1;
 };
+
 export const day$1part2 = (input: string[]) => {
   return $1;
 };
