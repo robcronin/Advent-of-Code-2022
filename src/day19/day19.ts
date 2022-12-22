@@ -196,49 +196,60 @@ const getRobotOptions2 = (
     requiredObsidianForExtraGeode > 0 &&
     requiredObsidianForExtraGeode <= numMinutes - 2
   ) {
-    if (canMakeObsidian && obsidianRobotOreCost <= expectedRemainingOre)
+    if (canMakeObsidian && obsidianRobotOreCost <= expectedRemainingOre) {
       return [Robot.OBSIDIAN];
+    } else if (canMakeObsidian) {
+      return [Robot.ORE, Robot.NONE];
+    }
   }
   // need one ore robot and can
   if (
     requiredOreForExtraGeode > 0 &&
     requiredOreForExtraGeode <= numMinutes - 2
   ) {
-    if (canMakeOre && oreRobotOreCost <= expectedRemainingOre + numMinutes - 2)
+    if (
+      canMakeOre &&
+      oreRobotOreCost <= expectedRemainingOre + numMinutes - 2
+    ) {
       return [Robot.ORE];
+    }
   }
 
-  // // need to make obsidian robot but can't right now
-  // if (
-  //   requiredObsidianForExtraGeode > 0 &&
-  //   requiredObsidianForExtraGeode <= numMinutes - 2 &&
-  //   !canMakeObsidian
-  // ) {
-  //   const neededOreForObsidian = obsidianRobotOreCost - expectedRemainingOre;
-  //   const neededClayForObsidian = obsidianRobotClayCost - expectedClayAtEnd;
+  // need to make obsidian robot but can't right now
+  if (
+    requiredObsidianForExtraGeode > 0 &&
+    requiredObsidianForExtraGeode <= numMinutes - 2 &&
+    !canMakeObsidian &&
+    !(obsidianRobotOreCost <= expectedRemainingOre)
+  ) {
+    const neededOreForObsidian = obsidianRobotOreCost - expectedRemainingOre;
+    const neededClayForObsidian = obsidianRobotClayCost - expectedClayAtEnd;
 
-  //   // can soon make obsidian robot, wait - RISKY
-  //   // if (neededOreForObsidian <= 0 && neededClayForObsidian <= 0) {
-  //   //   return [Robot.NONE];
-  //   // }
+    // can soon make obsidian robot, wait - RISKY
+    // if (neededOreForObsidian <= 0 && neededClayForObsidian <= 0) {
+    //   return [Robot.NONE];
+    // }
 
-  //   const options = [];
-  //   if (
-  //     neededOreForObsidian > 0 &&
-  //     neededOreForObsidian + oreRobotOreCost <= numMinutes - 1 &&
-  //     canMakeOre
-  //   ) {
-  //     options.push(Robot.ORE);
-  //   }
-  //   if (
-  //     neededClayForObsidian > 0 &&
-  //     neededClayForObsidian <= numMinutes - 1 &&
-  //     canMakeClay
-  //   ) {
-  //     options.push(Robot.CLAY);
-  //   }
-  //   if (options.length > 0) return options;
-  // }
+    const options = [];
+    if (
+      neededOreForObsidian > 0 &&
+      neededOreForObsidian + oreRobotOreCost <= numMinutes - 1 &&
+      canMakeOre
+    ) {
+      options.push(Robot.ORE);
+    }
+    if (
+      neededClayForObsidian > 0 &&
+      neededClayForObsidian <= numMinutes - 1 &&
+      canMakeClay
+    ) {
+      options.push(Robot.CLAY);
+    }
+    if (options.length > 0) {
+      console.log('OK IT IS USED');
+      return options;
+    }
+  }
 
   // // need one ore robot but can't right now
   // // if (requiredOreForExtraGeode > 0 && requiredOreForExtraGeode <= numMinutes - 2) {
