@@ -1,5 +1,4 @@
 import { sumArr } from '../utils/array';
-import { range } from '../utils/looping';
 
 type Blueprint = {
   id: number;
@@ -69,7 +68,7 @@ const getBackpackKey = (backpack: Backpack, numMinutes: number) => {
     numObsidianRobots,
     numGeodeRobots,
   } = backpack;
-  return `${numOre},${numClay},${numObsidian},${numGeode},${numOreRobots},${numClayRobots},${numObsidianRobots},${numGeodeRobots}`;
+  return `${numMinutes}:${numOre},${numClay},${numObsidian},${numGeode},${numOreRobots},${numClayRobots},${numObsidianRobots},${numGeodeRobots}`;
 };
 
 // const getRobotOptions = (blueprint: Blueprint, backpack: Backpack) => {
@@ -126,164 +125,150 @@ const getRobotOptions2 = (
   backpack: Backpack,
   numMinutes: number,
 ) => {
-  // const optimumObsidianRatio =
-  //   blueprint.geodeRobotObsidianCost / blueprint.geodeRobotOreCost;
-  // const optimumClayRatio =
-  //   blueprint.obsidianRobotClayCost / blueprint.obsidianRobotOreCost;
+  const {
+    id,
+    oreRobotOreCost,
+    clayRobotOreCost,
+    obsidianRobotOreCost,
+    obsidianRobotClayCost,
+    geodeRobotOreCost,
+    geodeRobotObsidianCost,
+  } = blueprint;
+  const {
+    numOre,
+    numClay,
+    numObsidian,
+    numGeode,
+    numOreRobots,
+    numClayRobots,
+    numObsidianRobots,
+    numGeodeRobots,
+  } = backpack;
 
-  const expectedOre = backpack.numOre + backpack.numOreRobots * numMinutes;
-  const expectedClay = backpack.numClay + backpack.numClayRobots * numMinutes;
-  const expectedObsidian =
-    backpack.numObsidian + backpack.numObsidianRobots * numMinutes;
-
-  // const expectedObsidianRatio = expectedObsidian / expectedOre;
-  // const expectedClayRatio = expectedClay / expectedOre;
-
+  /// Options that can be made
   const canMakeGeode =
-    blueprint.geodeRobotOreCost <= backpack.numOre &&
-    blueprint.geodeRobotObsidianCost <= backpack.numObsidian;
-
-  /// GEODES
-
+    geodeRobotOreCost <= numOre && geodeRobotObsidianCost <= numObsidian;
   if (canMakeGeode) return [Robot.GEODE];
+
+  const maxOreRobotsNeeded = Math.max(
+    clayRobotOreCost,
+    obsidianRobotOreCost,
+    geodeRobotOreCost,
+  );
+  const maxClayRobotsNeeded = obsidianRobotClayCost;
+  const maxObsidianRobotsNeeded = geodeRobotObsidianCost;
+
   const canMakeObsidian =
-    blueprint.obsidianRobotOreCost <= backpack.numOre &&
-    blueprint.obsidianRobotClayCost <= backpack.numClay;
-  const canMakeClay = blueprint.clayRobotOreCost <= backpack.numOre;
-  const canMakeOre = blueprint.oreRobotOreCost <= backpack.numOre;
+    obsidianRobotOreCost <= numOre &&
+    obsidianRobotClayCost <= numClay &&
+    numObsidianRobots < maxObsidianRobotsNeeded;
+  const canMakeClay =
+    clayRobotOreCost <= numOre && numClayRobots < maxClayRobotsNeeded;
+  const canMakeOre =
+    oreRobotOreCost <= numOre && numOreRobots < maxOreRobotsNeeded;
 
-  ////
+  /// EXPECTED supplies at end of time
+  const expectedOreAtEnd = numOre + numOreRobots * numMinutes;
+  const expectedClayAtEnd = numClay + numClayRobots * numMinutes;
+  const expectedObsidianAtEnd = numObsidian + numObsidianRobots * numMinutes;
 
-  const expectedGeodes = Math.min(
-    Math.floor(expectedObsidian / blueprint.geodeRobotObsidianCost),
-    Math.floor(expectedOre / blueprint.geodeRobotOreCost),
+  //// REQUIREMENTS for an extra geode robot
+
+  const expectedGeodesAtEnd = Math.min(
+    Math.floor(expectedObsidianAtEnd / geodeRobotObsidianCost),
+    Math.floor(expectedOreAtEnd / geodeRobotOreCost),
   );
 
   const expectedRemainingObsidian =
-    expectedObsidian - expectedGeodes * blueprint.geodeRobotObsidianCost;
+    expectedObsidianAtEnd - expectedGeodesAtEnd * geodeRobotObsidianCost;
   const expectedRemainingOre =
-    expectedOre - expectedGeodes * blueprint.geodeRobotOreCost;
+    expectedOreAtEnd - expectedGeodesAtEnd * geodeRobotOreCost;
 
-  const robotMakingMinutes = numMinutes - expectedGeodes - 1; // making geode in last minute is useless
-  const requiredObsidianForGeode =
-    blueprint.geodeRobotObsidianCost - expectedRemainingObsidian;
-  const requiredOreForGeode =
-    blueprint.geodeRobotOreCost - expectedRemainingOre;
-
-  // console.log({
-  //   robotMakingMinutes,
-  //   expectedRemainingOre,
-  //   expectedRemainingObsidian,
-  //   requiredObsidianForGeode,
-  //   requiredOreForGeode,
-  // });
+  const robotMakingMinutes = numMinutes - expectedGeodesAtEnd - 1; // making geode in last minute is useless
+  const requiredObsidianForExtraGeode =
+    geodeRobotObsidianCost - expectedRemainingObsidian;
+  const requiredOreForExtraGeode = geodeRobotOreCost - expectedRemainingOre;
 
   if (robotMakingMinutes < 1) return [Robot.NONE];
 
   // need to make one obsidian robot and can
   if (
-    requiredObsidianForGeode > 0 &&
-    requiredObsidianForGeode <= numMinutes - 2
+    requiredObsidianForExtraGeode > 0 &&
+    requiredObsidianForExtraGeode <= numMinutes - 2
   ) {
-    if (
-      canMakeObsidian &&
-      blueprint.obsidianRobotOreCost <= expectedRemainingOre
-    )
+    if (canMakeObsidian && obsidianRobotOreCost <= expectedRemainingOre)
       return [Robot.OBSIDIAN];
   }
   // need one ore robot and can
-  if (requiredOreForGeode > 0 && requiredOreForGeode <= numMinutes - 2) {
-    if (
-      canMakeOre &&
-      blueprint.oreRobotOreCost <= expectedRemainingOre + numMinutes - 2
-    )
+  if (
+    requiredOreForExtraGeode > 0 &&
+    requiredOreForExtraGeode <= numMinutes - 2
+  ) {
+    if (canMakeOre && oreRobotOreCost <= expectedRemainingOre + numMinutes - 2)
       return [Robot.ORE];
   }
 
-  // console.log('need to make obsidian robot');
+  // // need to make obsidian robot but can't right now
+  // if (
+  //   requiredObsidianForExtraGeode > 0 &&
+  //   requiredObsidianForExtraGeode <= numMinutes - 2 &&
+  //   !canMakeObsidian
+  // ) {
+  //   const neededOreForObsidian = obsidianRobotOreCost - expectedRemainingOre;
+  //   const neededClayForObsidian = obsidianRobotClayCost - expectedClayAtEnd;
 
-  // need to make obsidian robot but can't right now
-  if (
-    requiredObsidianForGeode > 0 &&
-    requiredObsidianForGeode <= numMinutes - 2 &&
-    !canMakeObsidian
-  ) {
-    const neededOreForObsidian =
-      blueprint.obsidianRobotOreCost - expectedRemainingOre;
-    const neededClayForObsidian =
-      blueprint.obsidianRobotClayCost - expectedClay;
+  //   // can soon make obsidian robot, wait - RISKY
+  //   // if (neededOreForObsidian <= 0 && neededClayForObsidian <= 0) {
+  //   //   return [Robot.NONE];
+  //   // }
 
-    // can soon make obsidian robot, wait - RISKY
-    // if (neededOreForObsidian <= 0 && neededClayForObsidian <= 0) {
-    //   return [Robot.NONE];
-    // }
-
-    const options = [];
-    if (
-      neededOreForObsidian > 0 &&
-      neededOreForObsidian + blueprint.oreRobotOreCost <= numMinutes - 1 &&
-      canMakeOre
-    ) {
-      options.push(Robot.ORE);
-    }
-    if (
-      neededClayForObsidian > 0 &&
-      neededClayForObsidian <= numMinutes - 1 &&
-      canMakeClay
-    ) {
-      options.push(Robot.CLAY);
-    }
-    if (options.length > 0) return options;
-  }
-
-  // need one ore robot but can't right now
-  // if (requiredOreForGeode > 0 && requiredOreForGeode <= numMinutes - 2) {
-  //   return [Robot.NONE];
-  // }
-
-  // console.log({ robotMakingMinutes });
-  ///////
-
-  const maxExtraSupply =
-    robotMakingMinutes > 0
-      ? range(robotMakingMinutes).reduce(
-          (acc, minute) => acc + (numMinutes - minute - 1),
-          0,
-        )
-      : 0;
-
-  // More than one obsidian robot needed
-  if (requiredObsidianForGeode > 0) {
-    if (maxExtraSupply < requiredObsidianForGeode) {
-      return [Robot.NONE];
-    }
-  }
-  // More than one ore robot needed
-  if (requiredOreForGeode > 0) {
-    if (maxExtraSupply < requiredOreForGeode) {
-      return [Robot.NONE];
-    }
-  }
-
-  ////
-  // const shouldMakeObsidian = expectedObsidianRatio <= optimumObsidianRatio;
-  // const shouldMakeClay = expectedClayRatio <= optimumClayRatio;
-
-  // return [Robot.NONE];
-  return getAllAvailableOptions(canMakeOre, canMakeClay, canMakeObsidian);
-
-  // if (canMakeObsidian && shouldMakeObsidian) {
-  //   options.push(Robot.OBSIDIAN);
-  // }
-  // if (canMakeClay && shouldMakeClay && shouldMakeObsidian) {
-  //   options.push(Robot.CLAY);
-  // }
-  // if (options.length === 0) {
-  //   if (canMakeOre) {
+  //   const options = [];
+  //   if (
+  //     neededOreForObsidian > 0 &&
+  //     neededOreForObsidian + oreRobotOreCost <= numMinutes - 1 &&
+  //     canMakeOre
+  //   ) {
   //     options.push(Robot.ORE);
   //   }
+  //   if (
+  //     neededClayForObsidian > 0 &&
+  //     neededClayForObsidian <= numMinutes - 1 &&
+  //     canMakeClay
+  //   ) {
+  //     options.push(Robot.CLAY);
+  //   }
+  //   if (options.length > 0) return options;
   // }
-  // return options;
+
+  // // need one ore robot but can't right now
+  // // if (requiredOreForExtraGeode > 0 && requiredOreForExtraGeode <= numMinutes - 2) {
+  // //   return [Robot.NONE];
+  // // }
+
+  ///////
+
+  // const maxExtraSupply =
+  //   robotMakingMinutes > 0
+  //     ? range(robotMakingMinutes).reduce(
+  //         (acc, minute) => acc + (numMinutes - minute - 1),
+  //         0,
+  //       )
+  //     : 0;
+
+  // // More than one obsidian robot needed
+  // if (requiredObsidianForExtraGeode > 0) {
+  //   if (maxExtraSupply < requiredObsidianForExtraGeode) {
+  //     return [Robot.NONE];
+  //   }
+  // }
+  // // More than one ore robot needed
+  // if (requiredOreForExtraGeode > 0) {
+  //   if (maxExtraSupply < requiredOreForExtraGeode) {
+  //     return [Robot.NONE];
+  //   }
+  // }
+
+  return getAllAvailableOptions(canMakeOre, canMakeClay, canMakeObsidian);
 };
 
 const getMaxNumGeodes = (

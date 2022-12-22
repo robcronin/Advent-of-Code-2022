@@ -4,27 +4,27 @@ import { data, testData } from './day19.data';
 
 describe.only('day 19', () => {
   it.only('one blueprint', () => {
-    expect(day19([testData[0]], 24)).toBe(9); // 33s -> 11.9s(no empty if all robots) -> 1s(maxore) -> 0.3s(max every) -> 0.08s (skip none)
+    expect(day19([testData[0]], 24)).toBe(9); // 34s -> 16s (prio obsidian)
   });
-  it.skip('second blueprint', () => {
-    expect(day19([testData[1]], 24)).toBe(24); // ??s -> 46.8s(no empty)-> 15s(maxore) -> 1.6s(max every) -> 0.2s (skip none)
+  it.only('second blueprint', () => {
+    expect(day19([testData[1]], 24)).toBe(24); // 73s -> 45s (prio obsidian)
   });
   it.skip('reduced test cases', () => {
-    expect(day19([testData[0]], 19)).toBe(1); // 27s -> 9s -> 0.1s (skip none)
+    expect(day19([testData[0]], 19)).toBe(1); //
   });
   it('test cases', () => {
-    expect(day19(testData, 24)).toBe(33); // 0.24s (skip none)
+    expect(day19(testData, 24)).toBe(33); //
   });
 
   it('zeroer', () => {
-    const answer = day19([data[2]], 24); // 11.7s (skip none)
+    const answer = day19([data[2]], 24); //
     logAnswer(answer, 19, 1);
     expect(answer).toBe(19);
     // 1335 - too low
   });
 
   it('answer', () => {
-    const answer = day19(data, 24); // 11.7s (skip none)
+    const answer = day19(data, 24); //
     logAnswer(answer, 19, 1);
     expect(answer).toBe(19);
     // 1335 - too low
