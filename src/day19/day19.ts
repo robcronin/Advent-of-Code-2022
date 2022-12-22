@@ -1,4 +1,5 @@
 import { sumArr } from '../utils/array';
+import { range } from '../utils/looping';
 
 type Blueprint = {
   id: number;
@@ -154,8 +155,8 @@ const getRobotOptions2 = (
   ////
 
   const expectedGeodes = Math.min(
-    expectedObsidian / blueprint.geodeRobotObsidianCost,
-    expectedOre / blueprint.geodeRobotOreCost,
+    Math.floor(expectedObsidian / blueprint.geodeRobotObsidianCost),
+    Math.floor(expectedOre / blueprint.geodeRobotOreCost),
   );
 
   const expectedRemainingObsidian =
@@ -163,7 +164,7 @@ const getRobotOptions2 = (
   const expectedRemainingOre =
     expectedOre - expectedGeodes * blueprint.geodeRobotOreCost;
 
-  const robotMakingMinutes = numMinutes - expectedGeodes;
+  const robotMakingMinutes = numMinutes - expectedGeodes - 1; // making geode in last minute is useless
   const requiredObsidianForGeode =
     blueprint.geodeRobotObsidianCost - expectedRemainingObsidian;
   const requiredOreForGeode =
@@ -236,18 +237,39 @@ const getRobotOptions2 = (
   }
 
   // need one ore robot but can't right now
-  if (requiredOreForGeode > 0 && requiredOreForGeode <= numMinutes - 2) {
-    return [Robot.NONE];
+  // if (requiredOreForGeode > 0 && requiredOreForGeode <= numMinutes - 2) {
+  //   return [Robot.NONE];
+  // }
+
+  // console.log({ robotMakingMinutes });
+  ///////
+
+  const maxExtraSupply =
+    robotMakingMinutes > 0
+      ? range(robotMakingMinutes).reduce(
+          (acc, minute) => acc + (numMinutes - minute - 1),
+          0,
+        )
+      : 0;
+
+  // More than one obsidian robot needed
+  if (requiredObsidianForGeode > 0) {
+    if (maxExtraSupply < requiredObsidianForGeode) {
+      return [Robot.NONE];
+    }
+  }
+  // More than one ore robot needed
+  if (requiredOreForGeode > 0) {
+    if (maxExtraSupply < requiredOreForGeode) {
+      return [Robot.NONE];
+    }
   }
 
-  // const maxObsidian = range
-
   ////
-
   // const shouldMakeObsidian = expectedObsidianRatio <= optimumObsidianRatio;
   // const shouldMakeClay = expectedClayRatio <= optimumClayRatio;
 
-  // return [Robot.NONE]
+  // return [Robot.NONE];
   return getAllAvailableOptions(canMakeOre, canMakeClay, canMakeObsidian);
 
   // if (canMakeObsidian && shouldMakeObsidian) {
