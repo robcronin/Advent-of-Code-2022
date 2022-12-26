@@ -1,21 +1,27 @@
-/*
-  This is a complete hack of code
-  I haven't even slightly attempted to clean this up once the star popped
-  Don't judge 😅
-*/
-
-import { sumArr } from '../utils/array';
-import { range } from '../utils/looping';
-
 type Lead = { id: string; steps: number };
 type Valve = {
   id: string;
   flowRate: number;
   leads: Lead[];
-  on: boolean;
 };
 type Valves = Record<string, Valve>;
-let memo: Record<string, number> = {};
+type Memo = Record<string, number>;
+type Option = {
+  location: string;
+  timeLeftAfterMove: number;
+  turnedOn?: string;
+  onValves: string[];
+};
+type MaxPressureInput = {
+  memo?: Memo;
+  valves: Valves;
+  myLocation?: string;
+  elephantLocation?: string;
+  currentPressure?: number;
+  myTimeLeft: number;
+  elephantTimeLeft?: number;
+  onValves?: string[];
+};
 
 const parseValves = (input: string[]): Valves =>
   input.reduce((acc, line) => {
@@ -29,7 +35,7 @@ const parseValves = (input: string[]): Valves =>
     const leads = leadsString
       .split(', ')
       .map((lead) => ({ id: lead, steps: 1 }));
-    return { ...acc, [id]: { id, flowRate: +flowRate, leads, on: false } };
+    return { ...acc, [id]: { id, flowRate: +flowRate, leads } };
   }, {});
 
 // Don't judge me on this monstrosity
@@ -91,277 +97,230 @@ const reduceValves = (valves: Valves, numMinutes: number, keepId: string) => {
   );
 };
 
-const getOnString = (valves: Valves) =>
-  Object.values(valves)
-    .reduce((acc: string[], valve) => {
-      if (valve.on) return [...acc, valve.id];
-      return acc;
-    }, [])
-    .sort((a, b) => (a > b ? 1 : -1))
-    .toString();
-
-const getAllOn = (valves: Valves): boolean =>
-  Object.values(valves).every((valve) => valve.on);
-
-const deepCopyValves = (valves: Valves): Valves =>
-  Object.keys(valves).reduce(
-    (acc: Valves, key) => ({ ...acc, [key]: { ...valves[key] } }),
-    {},
-  );
-
-const getMaxPressure = (
+const getUpperBound = (
   valves: Valves,
-  location: string,
+  onValves: string[],
   currentPressure: number,
-  currentTimeLeft: number,
-): number => {
-  if (currentTimeLeft <= 1) return currentPressure;
-  const memoString = `${location}-${currentTimeLeft}-${currentPressure}-${getOnString(
-    valves,
-  )}`;
-  if (memo[memoString]) return memo[memoString];
-  const currentValve = valves[location];
-  let onMax = 0;
-  let offMax = 0;
-  if (!currentValve.on) {
-    const pressureHere = currentValve.flowRate * (currentTimeLeft - 1);
-    onMax = pressureHere + currentPressure;
-    if (currentTimeLeft - 1 - 1 - 1 - 1 >= 0) {
-      // on, move, on, effect,
-      currentValve.leads.forEach((lead) => {
-        const newValves = {
-          ...valves,
-          [location]: { ...currentValve, on: true },
-        };
-        const timeLeftAfterMove = currentTimeLeft - 1 - lead.steps;
+  startingMyTimeLeft: number,
+  startingElephantTimeLeft: number = 0,
+) => {
+  const sorted = Object.values(valves)
+    .filter((valve) => !onValves.includes(valve.id))
+    .map((valve) => valve.flowRate)
+    .sort((a, b) => a - b);
 
-        const potentialPressure =
-          timeLeftAfterMove > 1
-            ? getMaxPressure(
-                newValves,
-                lead.id,
-                currentPressure + pressureHere,
-                timeLeftAfterMove,
-              )
-            : 0;
-        if (potentialPressure > onMax) onMax = potentialPressure;
-      });
+  let upperBound = currentPressure;
+  let myTimeLeft = startingMyTimeLeft;
+  let elephantTimeLeft = startingElephantTimeLeft;
+  let valvesLeft = sorted.length;
+  while (valvesLeft > 0 && (myTimeLeft > 1 || elephantTimeLeft > 1)) {
+    const myTimeAfter = myTimeLeft - 1;
+    const elephantTimeAfter = elephantTimeLeft - 1;
+    if (myTimeAfter > 0) {
+      upperBound += myTimeAfter * sorted[valvesLeft - 1];
+      myTimeLeft -= 2;
+      valvesLeft--;
+    }
+    if (elephantTimeAfter > 0) {
+      upperBound += elephantTimeAfter * sorted[valvesLeft - 1];
+      elephantTimeLeft -= 2;
+      valvesLeft--;
     }
   }
-  if (currentTimeLeft - 1 - 1 - 1 >= 0) {
-    currentValve.leads.forEach((lead) => {
-      const newValves = {
-        ...valves,
-      };
-      const timeLeftAfterMove = currentTimeLeft - lead.steps;
-
-      const potentialPressure =
-        timeLeftAfterMove > 1
-          ? getMaxPressure(
-              newValves,
-              lead.id,
-              currentPressure,
-              timeLeftAfterMove,
-            )
-          : 0;
-      if (potentialPressure > offMax) offMax = potentialPressure;
-    });
-  }
-  const ret = Math.max(onMax, offMax);
-  memo[memoString] = ret;
-  return ret;
+  return upperBound;
 };
 
-type Option = {
-  turnOn?: string;
-  moveTo?: string;
-  weight: number;
-};
-type Path = Option & { pressure: number; valves: Valves };
+const getAllOn = (valves: Valves, onValves: string[]): boolean =>
+  Object.keys(valves).length - 1 === onValves.length;
 
-const getOptions = (
-  valves: Valves,
+const getPersonOptions = (
+  onValves: string[],
+  valve: Valve,
   location: string,
-  sameLoc?: boolean,
-): Option[] => {
-  const valve = valves[location];
+  timeLeft: number,
+  otherTimeLeft: number,
+) => {
   const options: Option[] = [];
-  if (!valve.on && valve.flowRate > 0 && !sameLoc) {
-    options.push({ turnOn: location, weight: valve.flowRate });
-  }
-  valve.leads.forEach((lead) => {
-    const leadValve = valves[lead.id];
-    options.push({
-      moveTo: leadValve.id,
-      weight: 1 + (!leadValve.on ? leadValve.flowRate : 0),
+  if (
+    !onValves.includes(location) &&
+    valve.flowRate > 0 &&
+    timeLeft >= otherTimeLeft &&
+    timeLeft >= 2
+  ) {
+    valve.leads.forEach((lead) => {
+      const timeLeftAfterMove = timeLeft - 1 - lead.steps;
+      options.push({
+        location: lead.id,
+        timeLeftAfterMove,
+        turnedOn: valve.id,
+        onValves: [...onValves, location],
+      });
     });
-  });
+  }
+  if (timeLeft >= 3 && timeLeft >= otherTimeLeft) {
+    valve.leads.forEach((lead) => {
+      const timeLeftAfterMove = timeLeft - lead.steps;
+      options.push({
+        location: lead.id,
+        timeLeftAfterMove,
+        onValves: [...onValves],
+      });
+    });
+  }
   return options;
 };
 
-const chooseOption = (options: Option[]): Option => {
-  const totalWeight = sumArr(options, (option) => option.weight);
-  const rand = Math.random() * totalWeight;
-  let sum = 0;
-  const result = options.find((option) => {
-    sum += option.weight;
-    return rand <= sum;
-  });
-  if (!result) throw new Error('chooseOption failed');
-  return result;
-};
+const getAllOptions = (
+  onValves: string[],
+  myValve: Valve,
+  elephantValve: Valve,
+  myLocation: string,
+  elephantLocation: string,
+  myTimeLeft: number,
+  elephantTimeLeft: number,
+) => {
+  const myOptions = getPersonOptions(
+    onValves,
+    myValve,
+    myLocation,
+    myTimeLeft,
+    elephantTimeLeft,
+  );
+  const elephantOptions = getPersonOptions(
+    onValves,
+    elephantValve,
+    elephantLocation,
+    elephantTimeLeft,
+    myTimeLeft,
+  );
 
-const chooseParent = (paths: FullPath[]): FullPath => {
-  const totalWeight = sumArr(paths, (path) => path.pressure);
-  const rand = Math.random() * totalWeight;
-  let sum = 0;
-  const result = paths.find((path) => {
-    sum += path.pressure;
-    return rand <= sum;
-  });
-  if (!result) throw new Error('chooseParent failed');
-  return result;
-};
-
-type FullPath = {
-  myPath: Path[];
-  elephantPath: Path[];
-  pressure: number;
-};
-
-const generatePath = (
-  givenValves: Valves,
-  time: number,
-  startPos?: {
-    myLocation: string;
-    elephantLocation: string;
-    timeLeft: number;
-    pressure: number;
-    myPath: Path[];
-    elephantPath: Path[];
-  },
-): FullPath => {
-  const valves = deepCopyValves(givenValves);
-  let myLocation = startPos?.myLocation ?? 'AA';
-  let elephantLocation = startPos?.elephantLocation ?? 'AA';
-  let timeLeft = startPos?.timeLeft ?? time;
-  let pressure = startPos?.pressure ?? 0;
-  let myPath: Path[] = startPos?.myPath ?? [];
-  let elephantPath: Path[] = startPos?.elephantPath ?? [];
-
-  while (!getAllOn(valves) && timeLeft > 0) {
-    const myValve = valves[myLocation];
-    const elephantValve = valves[elephantLocation];
-    const myOptions = getOptions(valves, myLocation);
-    const elephantOptions = getOptions(
-      valves,
-      elephantLocation,
-      myLocation === elephantLocation,
-    );
-    const myOption = chooseOption(myOptions);
-    const elephantOption = chooseOption(elephantOptions);
-    if (myOption.turnOn) {
-      pressure += myValve.flowRate * (timeLeft - 1);
-      valves[myLocation].on = true;
-    } else if (myOption.moveTo) {
-      myLocation = myOption.moveTo;
-    }
-    if (elephantOption.turnOn) {
-      pressure += elephantValve.flowRate * (timeLeft - 1);
-      valves[elephantLocation].on = true;
-    } else if (elephantOption.moveTo) {
-      elephantLocation = elephantOption.moveTo;
-    }
-    myPath.push({ ...myOption, pressure, valves: deepCopyValves(valves) });
-    elephantPath.push({
-      ...elephantOption,
-      pressure,
-      valves: deepCopyValves(valves),
+  if (myOptions.length === 0 && elephantOptions.length > 0) {
+    myOptions.push({
+      location: myValve.id,
+      timeLeftAfterMove: myTimeLeft,
+      onValves: [...onValves],
     });
-    timeLeft -= 1;
   }
-  return { myPath, elephantPath, pressure };
+  if (elephantOptions.length === 0 && myOptions.length > 0) {
+    elephantOptions.push({
+      location: elephantValve.id,
+      timeLeftAfterMove: elephantTimeLeft,
+      onValves: [...onValves],
+    });
+  }
+  return { myOptions, elephantOptions };
+};
+
+const getMaxPressure = ({
+  memo = { globalMax: 0 },
+  valves,
+  myLocation = 'AA',
+  elephantLocation = 'AA',
+  currentPressure = 0,
+  myTimeLeft,
+  elephantTimeLeft = 0,
+  onValves = [],
+}: MaxPressureInput): number => {
+  // early return cases
+  if (myTimeLeft <= 1 && elephantTimeLeft <= 1) return currentPressure;
+  if (getAllOn(valves, onValves)) return currentPressure;
+  const memoString = `${myLocation}-${elephantLocation}-${myTimeLeft}-${elephantTimeLeft}-${currentPressure}}`;
+  if (memo[memoString]) return memo[memoString];
+  const reverseString = `${elephantLocation}-${myLocation}-${elephantTimeLeft}-${myTimeLeft}-${currentPressure}}`;
+  if (memo[reverseString]) return memo[reverseString];
+
+  // upper bound check
+  const upperBound = getUpperBound(
+    valves,
+    onValves,
+    currentPressure,
+    myTimeLeft,
+    elephantTimeLeft,
+  );
+  if (upperBound < memo.globalMax) {
+    memo[memoString] = currentPressure;
+    return currentPressure;
+  }
+
+  // get possible options from here
+  const myValve = valves[myLocation];
+  const elephantValve = valves[elephantLocation];
+  const { myOptions, elephantOptions } = getAllOptions(
+    onValves,
+    myValve,
+    elephantValve,
+    myLocation,
+    elephantLocation,
+    myTimeLeft,
+    elephantTimeLeft,
+  );
+
+  // find max pressure from here
+  let max = 0;
+  myOptions.forEach((myOption) => {
+    elephantOptions.forEach((elephantOption) => {
+      const combinedOnValves = [...myOption.onValves];
+      elephantOption.onValves.forEach((onValve) => {
+        if (!combinedOnValves.includes(onValve)) combinedOnValves.push(onValve);
+      });
+
+      const sameTurnOn =
+        myOption.turnedOn &&
+        elephantOption.turnedOn &&
+        myOption.turnedOn === elephantOption.turnedOn;
+      if (!sameTurnOn) {
+        const myPressureHere = myOption.turnedOn
+          ? myValve.flowRate * (myTimeLeft - 1)
+          : 0;
+        const elephantPressureHere = elephantOption.turnedOn
+          ? elephantValve.flowRate * (elephantTimeLeft - 1)
+          : 0;
+        const turnOnMax =
+          myPressureHere + elephantPressureHere + currentPressure;
+        if (turnOnMax > max) max = turnOnMax;
+
+        const potentialPressure =
+          myOption.timeLeftAfterMove >= 2 ||
+          elephantOption.timeLeftAfterMove >= 2
+            ? getMaxPressure({
+                memo,
+                valves,
+                myLocation: myOption.location,
+                elephantLocation: elephantOption.location,
+                currentPressure: turnOnMax,
+                myTimeLeft:
+                  myOption.timeLeftAfterMove > 0
+                    ? myOption.timeLeftAfterMove
+                    : 0,
+                elephantTimeLeft:
+                  elephantOption.timeLeftAfterMove > 0
+                    ? elephantOption.timeLeftAfterMove
+                    : 0,
+                onValves: [...combinedOnValves],
+              })
+            : 0;
+
+        if (potentialPressure > max) max = potentialPressure;
+      }
+    });
+  });
+
+  memo[memoString] = max;
+  if (max > memo.globalMax) memo.globalMax = max;
+  return max;
 };
 
 export const day16 = (input: string[], time: number) => {
-  memo = {};
   const valves = parseValves(input);
   const reducedValves = reduceValves(valves, time, 'AA');
-  return getMaxPressure(reducedValves, 'AA', 0, time);
+  return getMaxPressure({ valves: reducedValves, myTimeLeft: time });
 };
 export const day16part2 = (input: string[], time: number) => {
-  memo = {};
   const valves = parseValves(input);
-  let max = 0;
-  // let max = 2166;
-  const poolSize = time * 5;
-  const prePoolSample = 1 * time;
-  const poolThreshold = 0.5;
-  const geneticIncreaseThreshold = time * 5000;
-  let timeSinceIncrease = 0;
-  range(prePoolSample).forEach(() => {
-    const path = generatePath(valves, time);
-    if (path.pressure > max) {
-      max = path.pressure;
-    }
+  const reducedValves = reduceValves(valves, time, 'AA');
+  return getMaxPressure({
+    valves: reducedValves,
+    myTimeLeft: time,
+    elephantTimeLeft: time,
   });
-  console.log('pre pool creation max', max);
-  let pool = [];
-  while (pool.length < poolSize) {
-    const path = generatePath(valves, time);
-    if (path.pressure > max) {
-      max = path.pressure;
-    }
-    if (path.pressure > max * poolThreshold) {
-      pool.push(path);
-    }
-  }
-  pool.sort((a, b) => b.pressure - a.pressure);
-  // console.log({ pool });
-  console.log('max at pre mutation point', max);
-  while (timeSinceIncrease < geneticIncreaseThreshold) {
-    // const parentIndex = Math.floor(poolSize * Math.random());
-    // const parent = pool[parentIndex];
-    const parent = chooseParent(pool);
-    const mutationIndex =
-      Math.floor((parent.myPath.length - 1) * Math.random()) + 1;
-    const myPath = parent.myPath.slice(0, mutationIndex);
-    const elephantPath = parent.elephantPath.slice(0, mutationIndex);
-    const myLocation =
-      myPath[myPath.length - 1].turnOn ||
-      (myPath[myPath.length - 1].moveTo as string);
-    const elephantLocation =
-      elephantPath[elephantPath.length - 1].turnOn ||
-      (elephantPath[elephantPath.length - 1].moveTo as string);
-    const startPoint = {
-      myLocation,
-      elephantLocation,
-      timeLeft: time - mutationIndex,
-      pressure: myPath[myPath.length - 1].pressure,
-      myPath: parent.myPath.slice(0, mutationIndex),
-      elephantPath: parent.elephantPath.slice(0, mutationIndex),
-    };
-    // console.log({ mutationIndex, startPoint });
-    const path = generatePath(
-      deepCopyValves(myPath[myPath.length - 1].valves),
-      startPoint.timeLeft,
-      startPoint,
-    );
-    // console.log({ path });
-    if (path.pressure > max) {
-      max = path.pressure;
-      console.log('new max in genetic', max);
-      timeSinceIncrease = 0;
-    } else {
-      timeSinceIncrease++;
-    }
-    // if (path.pressure > pool[pool.length - 1].pressure) {
-    pool.pop();
-    pool.push(path);
-    pool.sort((a, b) => b.pressure - a.pressure);
-    // }
-  }
-  console.log('max at post mutation point', max);
-
-  return max;
 };
